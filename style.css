@@ -1,0 +1,45 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #282c34;
+    color: #ffffff;
+}
+
+.container {
+    /*display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-gap: 1rem;
+    */
+    padding: 1rem;
+}
+
+.logo {
+    font-size: 2rem;
+    margin: 1rem;
+    text-align: center;
+}
+
+button {
+    padding: 0.5rem;
+    border: 1px solid #ffffff;
+    border-radius: 3px;
+    background-color: transparent;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #444;
+}
+
+input, textarea {
+    padding: 0.5rem;
+    border: 1px solid #ffffff;
+    border-radius: 3px;
+    background-color: transparent;
+    color: #ffffff;
+}
+
+/* Add more styles as needed */
+
