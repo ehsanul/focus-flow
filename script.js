@@ -82,7 +82,7 @@ function displayTasks() {
 
 function startTimer() {
     clearInterval(timer);
-    let timeLeft = 15; // * 60;
+    let timeLeft = 15 * 60;
     const timerDisplay = document.createElement("div");
 
     function updateTimerDisplay() {
@@ -226,10 +226,11 @@ function createStartButton() {
 
 createTaskForm();
 displayTasks();
-createStartButton();
 
 document.addEventListener("DOMContentLoaded", () => {
     if (tasks.length > 0) {
         startTimer();
+    } else {
+      createStartButton();
     }
 });
