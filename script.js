@@ -1,9 +1,9 @@
-
 const container = document.querySelector(".container");
 
 let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
 let taskStats = JSON.parse(localStorage.getItem("taskStats")) || {};
 let timer;
+let workSessionStart = new Date();
 
 function saveTasks() {
     localStorage.setItem("tasks", JSON.stringify(tasks));
@@ -11,6 +11,36 @@ function saveTasks() {
 
 function saveTaskStats() {
     localStorage.setItem("taskStats", JSON.stringify(taskStats));
+}
+
+function saveWorkSession() {
+    const workSessions = JSON.parse(localStorage.getItem("workSessions")) || [];
+    workSessions.push({
+        start: workSessionStart,
+        end: new Date(),
+        tasks,
+        taskStats,
+    });
+    localStorage.setItem("workSessions", JSON.stringify(workSessions));
+}
+
+function clearCurrentSession() {
+    tasks = [];
+    taskStats = {};
+    saveTasks();
+    saveTaskStats();
+}
+
+function createEndWorkButton() {
+    const endWorkButton = document.createElement("button");
+    endWorkButton.textContent = "End Work";
+    endWorkButton.addEventListener("click", () => {
+        clearInterval(timer);
+        saveWorkSession();
+        clearCurrentSession();
+        location.reload();
+    });
+    container.appendChild(endWorkButton);
 }
 
 function createTaskForm() {
@@ -173,7 +203,7 @@ function askUserWhatTheyAreDoing() {
             taskStats[uniqueTasks[taskIndex].name] =
                 (taskStats[uniqueTasks[taskIndex].name] || 0) + 1;
             saveTaskStats();
-            displayTaskStats();
+            displayTaskStats(taskStats, tasks);
             handleButtonClick();
         })
     );
@@ -195,64 +225,118 @@ function askUserWhatTheyAreDoing() {
         const otherTask = formData.get("otherTask");
         taskStats[otherTask] = (taskStats[otherTask] || 0) + 1;
         saveTaskStats();
-        displayTaskStats();
+        displayTaskStats(taskStats, tasks);
         handleButtonClick();
     });
 }
 
-function displayTaskStats() {
-    const taskStatsList = document.querySelector('.task-stats-list');
-    if (taskStatsList) {
-        container.removeChild(taskStatsList);
+function displayTaskStats(taskStatsToDisplay, tasksForDisplay) {
+    const existingTaskStatsList = document.querySelector(".task-stats-list");
+    if (existingTaskStatsList) {
+        container.removeChild(existingTaskStatsList);
     }
 
-    const maxHours = Math.max(
-        ...Object.entries(taskStats).map(([_, count]) => count * 15 / 60),
-        ...tasks.map(task => task.hours)
+    const taskStatsList = document.createElement("div");
+    taskStatsList.classList.add("task-stats-list");
+
+    const maxTaskEstimateOrStat = Math.max(
+        ...tasksForDisplay.map((task) => task.hours),
+        ...Object.values(taskStatsToDisplay).map((count) => (count * 15) / 60)
     );
 
-    const newTaskStatsList = document.createElement("ul");
-    newTaskStatsList.classList.add("task-stats-list");
-    newTaskStatsList.innerHTML = Object.entries(taskStats)
-        .map(([task, count]) => {
-            const hours = count * 15 / 60;
-            const taskObj = tasks.find(t => t.name === task);
-            const estimatedHours = taskObj ? taskObj.hours : 0;
-            const greenWidth = Math.min(hours, estimatedHours) / maxHours * 100;
-            const redWidth = Math.max(0, hours - estimatedHours) / maxHours * 100;
-            return `
-                <li>
-                    <span class="task-name">${task}:</span>
-                    <span class="task-hours">${hours.toFixed(2)} hours</span>
-                    <div class="bar-container">
-                        <div class="bar green-bar" style="width: ${greenWidth}%;"></div>
-                        <div class="bar red-bar" style="width: ${redWidth}%;"></div>
-                    </div>
-                </li>
-            `;
-        })
+    taskStatsList.innerHTML = Object.entries(taskStatsToDisplay)
+        .map(
+            ([task, count]) => {
+                const taskHours = (count * 15) / 60;
+                const taskEstimate = tasksForDisplay.find((t) => t.name === task)?.hours || 0;
+                const greenWidth = Math.min(taskHours, taskEstimate) / maxTaskEstimateOrStat * 100;
+                const redWidth = Math.max(0, taskHours - taskEstimate) / maxTaskEstimateOrStat * 100;
+                return `
+        <div class="bar-container">
+            <span>${task}</span>
+            <div class="bar">
+                <div class="green" style="width: ${greenWidth}%;"></div>
+                <div class="red" style="width: ${redWidth}%;"></div>
+            </div>
+            <span>${taskHours.toFixed(2)} hours</span>
+        </div>
+    `;
+            }
+        )
         .join("");
-    container.appendChild(newTaskStatsList);
+    container.appendChild(taskStatsList);
 }
-
 
 function createStartButton() {
     const startButton = document.createElement("button");
     startButton.textContent = "Start Timer";
     startButton.addEventListener("click", () => {
+        workSessionStart = new Date();
         startTimer();
         startButton.remove();
     });
     container.appendChild(startButton);
 }
 
+function createHistoryButton() {
+    const historyButton = document.createElement("button");
+    historyButton.textContent = "View History";
+    historyButton.addEventListener("click", () => {
+        const workSessions = JSON.parse(localStorage.getItem("workSessions")) || [];
+        displayHistory(workSessions.length - 1); // show last session by default
+    });
+    container.appendChild(historyButton);
+}
+
+function displayHistory(sessionIndex) {
+    const workSessions = JSON.parse(localStorage.getItem("workSessions")) || [];
+
+    if (workSessions.length === 0) {
+        alert("No work session history found.");
+        return;
+    }
+
+    const session = workSessions[sessionIndex];
+    const sessionDuration = (new Date(session.end) - new Date(session.start)) / 1000 / 60;
+    const historyContainer = document.createElement("div");
+    historyContainer.classList.add("history-container");
+    historyContainer.innerHTML = `
+        <h2>Work Session History</h2>
+        <p>Session ${sessionIndex + 1} of ${workSessions.length}</p>
+        <p>Start Time: ${new Date(session.start).toLocaleString()}</p>
+        <p>Duration: ${sessionDuration.toFixed(2)} minutes</p>
+        <button id="prev-session" ${sessionIndex === 0 ? "disabled" : ""}>Previous</button>
+        <button id="next-session" ${
+            sessionIndex === workSessions.length - 1 ? "disabled" : ""
+        }>Next</button>
+    `;
+
+    container.appendChild(historyContainer);
+
+    console.log(session)
+    displayTaskStats(session.taskStats, session.tasks);
+
+    document.getElementById("prev-session").addEventListener("click", () => {
+        container.removeChild(historyContainer);
+        displayHistory(sessionIndex - 1);
+    });
+
+    document.getElementById("next-session").addEventListener("click", () => {
+        container.removeChild(historyContainer);
+        displayHistory(sessionIndex + 1);
+    });
+}
+
 createTaskForm();
 displayTasks();
+displayTaskStats(taskStats, tasks);
 
 document.addEventListener("DOMContentLoaded", () => {
     if (tasks.length > 0) {
         startTimer();
     } else {
-      createStartButton();
+        createStartButton();
     }
+    createEndWorkButton();
+    createHistoryButton();
 });
