@@ -113,6 +113,7 @@ function playBeep() {
     beepAudio = new Audio(
         "https://freesound.org/data/previews/316/316847_4939433-lq.mp3"
     );
+    beepAudio.volume = 0.5;
     beepAudio.loop = true;
     beepAudio.play();
 }
@@ -199,20 +200,41 @@ function askUserWhatTheyAreDoing() {
     });
 }
 
-
 function displayTaskStats() {
-    const taskStatsList = document.createElement("ul");
-    taskStatsList.innerHTML = Object.entries(taskStats)
-        .map(
-            ([task, count]) => `
-        <li>
-            ${task}: ${count * 15 / 60} hours
-        </li>
-    `
-        )
+    const taskStatsList = document.querySelector('.task-stats-list');
+    if (taskStatsList) {
+        container.removeChild(taskStatsList);
+    }
+
+    const maxHours = Math.max(
+        ...Object.entries(taskStats).map(([_, count]) => count * 15 / 60),
+        ...tasks.map(task => task.hours)
+    );
+
+    const newTaskStatsList = document.createElement("ul");
+    newTaskStatsList.classList.add("task-stats-list");
+    newTaskStatsList.innerHTML = Object.entries(taskStats)
+        .map(([task, count]) => {
+            const hours = count * 15 / 60;
+            const taskObj = tasks.find(t => t.name === task);
+            const estimatedHours = taskObj ? taskObj.hours : 0;
+            const greenWidth = Math.min(hours, estimatedHours) / maxHours * 100;
+            const redWidth = Math.max(0, hours - estimatedHours) / maxHours * 100;
+            return `
+                <li>
+                    <span class="task-name">${task}:</span>
+                    <span class="task-hours">${hours.toFixed(2)} hours</span>
+                    <div class="bar-container">
+                        <div class="bar green-bar" style="width: ${greenWidth}%;"></div>
+                        <div class="bar red-bar" style="width: ${redWidth}%;"></div>
+                    </div>
+                </li>
+            `;
+        })
         .join("");
-    container.appendChild(taskStatsList);
+    container.appendChild(newTaskStatsList);
 }
+
 
 function createStartButton() {
     const startButton = document.createElement("button");
