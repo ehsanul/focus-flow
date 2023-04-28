@@ -121,8 +121,15 @@ function displayTasks() {
 
 function startTimer() {
   clearInterval(timer);
-  let timeLeft = 15 * 60;
+
+  const storedTimeLeft = localStorage.getItem("timeLeft");
+  let timeLeft = storedTimeLeft ? parseInt(storedTimeLeft) : 15 * 60;
+
   const timerDisplay = document.createElement("div");
+  const pauseButton = document.createElement("button");
+  pauseButton.innerHTML = "⏸️";
+
+  let timerPaused = false;
 
   function updateTimerDisplay() {
     const minutes = Math.floor(timeLeft / 60);
@@ -133,19 +140,30 @@ function startTimer() {
   }
 
   function onTimerTick() {
-    timeLeft--;
-    updateTimerDisplay();
+    if (!timerPaused) {
+      timeLeft--;
+      localStorage.setItem("timeLeft", timeLeft);
+      updateTimerDisplay();
+    }
 
     if (timeLeft <= 0) {
       clearInterval(timer);
       timerDisplay.remove();
+      pauseButton.remove();
+      localStorage.removeItem("timeLeft");
       playBeep();
       askUserWhatTheyAreDoing();
     }
   }
 
+  pauseButton.addEventListener("click", () => {
+    timerPaused = !timerPaused;
+    pauseButton.innerHTML = timerPaused ? "▶️" : "⏸️";
+  });
+
   updateTimerDisplay();
   container.appendChild(timerDisplay);
+  container.appendChild(pauseButton);
   timer = setInterval(onTimerTick, 1000);
 }
 
