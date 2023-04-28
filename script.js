@@ -4,6 +4,9 @@ let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
 let taskStats = JSON.parse(localStorage.getItem("taskStats")) || {};
 let timer;
 let workSessionStart = new Date();
+let beepAudio;
+let volume = 0;
+let increaseVolumeInterval;
 
 function saveTasks() {
   localStorage.setItem("tasks", JSON.stringify(tasks));
@@ -146,19 +149,17 @@ function startTimer() {
   timer = setInterval(onTimerTick, 1000);
 }
 
-let beepAudio;
-let volume = 0;
-
 function playBeep() {
   beepAudio = new Audio(
     "https://freesound.org/data/previews/316/316847_4939433-lq.mp3"
   );
+  volume = 0;
   beepAudio.volume = 0;
   beepAudio.loop = true;
   beepAudio.play();
 
-  const increaseVolumeInterval = setInterval(() => {
-    volume += 0.01;
+  increaseVolumeInterval = setInterval(() => {
+    volume += 0.001;
     beepAudio.volume = Math.min(1, volume);
     if (volume >= 1) {
       clearInterval(increaseVolumeInterval);
@@ -170,8 +171,8 @@ function stopBeep() {
   if (beepAudio) {
     beepAudio.pause();
     beepAudio.currentTime = 0;
-    volume = 0;
   }
+  clearInterval(increaseVolumeInterval);
 }
 
 function askUserWhatTheyAreDoing() {
@@ -226,7 +227,7 @@ function askUserWhatTheyAreDoing() {
       taskStats[uniqueTasks[taskIndex].name] =
         (taskStats[uniqueTasks[taskIndex].name] || 0) + 1;
       saveTaskStats();
-      displayTaskStats(taskStats, tasks);
+      displayTaskStats(container, taskStats, tasks);
       handleButtonClick();
     })
   );
@@ -237,9 +238,9 @@ function askUserWhatTheyAreDoing() {
   otherButton.addEventListener("click", () => {
     otherButton.style.display = "none";
     otherForm.style.display = "block";
-    if (beepAudio) {
-      beepAudio.volume = 0.25; // make it quieter while typing
-    }
+    // make it quieter while typing temporarily
+    volume = 0;
+    beepAudio.volume = 0;
   });
 
   otherForm.addEventListener("submit", (e) => {
@@ -248,13 +249,13 @@ function askUserWhatTheyAreDoing() {
     const otherTask = formData.get("otherTask");
     taskStats[otherTask] = (taskStats[otherTask] || 0) + 1;
     saveTaskStats();
-    displayTaskStats(taskStats, tasks);
+    displayTaskStats(container, taskStats, tasks);
     handleButtonClick();
   });
 }
 
-function displayTaskStats(taskStatsToDisplay, tasksForDisplay) {
-  const existingTaskStatsList = document.querySelector(".task-stats-list");
+function displayTaskStats(container, taskStats, tasks) {
+  const existingTaskStatsList = container.querySelector(".task-stats-list");
   if (existingTaskStatsList) {
     container.removeChild(existingTaskStatsList);
   }
@@ -263,15 +264,14 @@ function displayTaskStats(taskStatsToDisplay, tasksForDisplay) {
   taskStatsList.classList.add("task-stats-list");
 
   const maxTaskEstimateOrStat = Math.max(
-    ...tasksForDisplay.map((task) => task.hours),
-    ...Object.values(taskStatsToDisplay).map((count) => (count * 15) / 60)
+    ...tasks.map((task) => task.hours),
+    ...Object.values(taskStats).map((count) => (count * 15) / 60)
   );
 
-  taskStatsList.innerHTML = Object.entries(taskStatsToDisplay)
+  taskStatsList.innerHTML = Object.entries(taskStats)
     .map(([task, count]) => {
       const taskHours = (count * 15) / 60;
-      const taskEstimate =
-        tasksForDisplay.find((t) => t.name === task)?.hours || 0;
+      const taskEstimate = tasks.find((t) => t.name === task)?.hours || 0;
       const greenWidth =
         (Math.min(taskHours, taskEstimate) / maxTaskEstimateOrStat) * 100;
       const redWidth =
@@ -289,6 +289,13 @@ function displayTaskStats(taskStatsToDisplay, tasksForDisplay) {
     })
     .join("");
   container.appendChild(taskStatsList);
+}
+
+function closeHistory() {
+  const overlay = document.getElementById("visualization-overlay");
+  if (overlay) {
+    overlay.remove();
+  }
 }
 
 function createStartButton() {
@@ -323,8 +330,12 @@ function displayHistory(sessionIndex) {
   const session = workSessions[sessionIndex];
   const sessionDuration =
     (new Date(session.end) - new Date(session.start)) / 1000 / 60;
+
+  const overlay = document.createElement("div");
+  overlay.setAttribute("id", "visualization-overlay");
   const historyContainer = document.createElement("div");
   historyContainer.classList.add("history-container");
+  historyContainer.id = "visualization-overlay";
   historyContainer.innerHTML = `
         <h2>Work Session History</h2>
         <p>Session ${sessionIndex + 1} of ${workSessions.length}</p>
@@ -336,27 +347,38 @@ function displayHistory(sessionIndex) {
         <button id="next-session" ${
           sessionIndex === workSessions.length - 1 ? "disabled" : ""
         }>Next</button>
+        <button id="close-overlay">Close Overlay</button>
     `;
 
-  container.appendChild(historyContainer);
-
-  console.log(session);
-  displayTaskStats(session.taskStats, session.tasks);
+  displayTaskStats(historyContainer, session.taskStats, session.tasks);
+  overlay.appendChild(historyContainer);
+  container.appendChild(overlay);
 
   document.getElementById("prev-session").addEventListener("click", () => {
-    container.removeChild(historyContainer);
+    container.removeChild(overlay);
     displayHistory(sessionIndex - 1);
   });
 
   document.getElementById("next-session").addEventListener("click", () => {
-    container.removeChild(historyContainer);
+    container.removeChild(overlay);
     displayHistory(sessionIndex + 1);
   });
+
+  document
+    .getElementById("close-overlay")
+    .addEventListener("click", closeHistory);
+}
+
+function closeHistory() {
+  const visualizationOverlay = document.getElementById("visualization-overlay");
+  if (visualizationOverlay) {
+    container.removeChild(visualizationOverlay);
+  }
 }
 
 createTaskForm();
 displayTasks();
-displayTaskStats(taskStats, tasks);
+displayTaskStats(container, taskStats, tasks);
 
 document.addEventListener("DOMContentLoaded", () => {
   if (tasks.length > 0) {
