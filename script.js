@@ -3,7 +3,7 @@ const container = document.querySelector(".container");
 let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
 let taskStats = JSON.parse(localStorage.getItem("taskStats")) || {};
 let timer;
-let workSessionStart = new Date();
+let workSessionStart;
 let beepAudio;
 let volume = 0;
 let increaseVolumeInterval;
@@ -32,6 +32,8 @@ function clearCurrentSession() {
   taskStats = {};
   saveTasks();
   saveTaskStats();
+  localStorage.removeItem("workSessionStart");
+  localStorage.removeItem("timeLeft");
 }
 
 function createEndWorkButton() {
@@ -119,7 +121,15 @@ function displayTasks() {
   );
 }
 
+function findOrStartWorkSession() {
+  const storedWorkSessionStart = localStorage.getItem("workSessionStart");
+  workSessionStart = storedWorkSessionStart ? new Date(storedWorkSessionStart) : new Date();
+  localStorage.setItem("workSessionStart", workSessionStart.toISOString());
+}
+
 function startTimer() {
+  findOrStartWorkSession();
+
   clearInterval(timer);
 
   const storedTimeLeft = localStorage.getItem("timeLeft");
@@ -134,9 +144,7 @@ function startTimer() {
   function updateTimerDisplay() {
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
-    timerDisplay.textContent = `${minutes}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
+    timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
   function onTimerTick() {
@@ -168,9 +176,7 @@ function startTimer() {
 }
 
 function playBeep() {
-  beepAudio = new Audio(
-    "https://freesound.org/data/previews/316/316847_4939433-lq.mp3"
-  );
+  beepAudio = new Audio("https://freesound.org/data/previews/316/316847_4939433-lq.mp3");
   volume = 0;
   beepAudio.volume = 0;
   beepAudio.loop = true;
@@ -199,19 +205,12 @@ function askUserWhatTheyAreDoing() {
   const uniqueTasks = tasks
     .concat(
       Object.keys(taskStats)
-        .filter(
-          (task) =>
-            !tasks.some((t) => t.name.toLowerCase() === task.toLowerCase())
-        )
+        .filter((task) => !tasks.some((t) => t.name.toLowerCase() === task.toLowerCase()))
         .map((task) => ({ name: task }))
     )
     .concat(
       additionalTasks.filter(
-        (additionalTask) =>
-          !tasks.some(
-            (task) =>
-              task.name.toLowerCase() === additionalTask.name.toLowerCase()
-          )
+        (additionalTask) => !tasks.some((task) => task.name.toLowerCase() === additionalTask.name.toLowerCase())
       )
     );
 
@@ -242,8 +241,7 @@ function askUserWhatTheyAreDoing() {
   prompt.querySelectorAll(".task-button").forEach((button) =>
     button.addEventListener("click", (e) => {
       const taskIndex = e.target.dataset.index;
-      taskStats[uniqueTasks[taskIndex].name] =
-        (taskStats[uniqueTasks[taskIndex].name] || 0) + 1;
+      taskStats[uniqueTasks[taskIndex].name] = (taskStats[uniqueTasks[taskIndex].name] || 0) + 1;
       saveTaskStats();
       displayTaskStats(container, taskStats, tasks);
       handleButtonClick();
@@ -290,10 +288,8 @@ function displayTaskStats(container, taskStats, tasks) {
     .map(([task, count]) => {
       const taskHours = (count * 15) / 60;
       const taskEstimate = tasks.find((t) => t.name === task)?.hours || 0;
-      const greenWidth =
-        (Math.min(taskHours, taskEstimate) / maxTaskEstimateOrStat) * 100;
-      const redWidth =
-        (Math.max(0, taskHours - taskEstimate) / maxTaskEstimateOrStat) * 100;
+      const greenWidth = (Math.min(taskHours, taskEstimate) / maxTaskEstimateOrStat) * 100;
+      const redWidth = (Math.max(0, taskHours - taskEstimate) / maxTaskEstimateOrStat) * 100;
       return `
         <div class="bar-container">
             <span>${task}</span>
@@ -346,8 +342,7 @@ function displayHistory(sessionIndex) {
   }
 
   const session = workSessions[sessionIndex];
-  const sessionDuration =
-    (new Date(session.end) - new Date(session.start)) / 1000 / 60;
+  const sessionDuration = (new Date(session.end) - new Date(session.start)) / 1000 / 60;
 
   const overlay = document.createElement("div");
   overlay.setAttribute("id", "visualization-overlay");
@@ -359,12 +354,8 @@ function displayHistory(sessionIndex) {
         <p>Session ${sessionIndex + 1} of ${workSessions.length}</p>
         <p>Start Time: ${new Date(session.start).toLocaleString()}</p>
         <p>Duration: ${sessionDuration.toFixed(2)} minutes</p>
-        <button id="prev-session" ${
-          sessionIndex === 0 ? "disabled" : ""
-        }>Previous</button>
-        <button id="next-session" ${
-          sessionIndex === workSessions.length - 1 ? "disabled" : ""
-        }>Next</button>
+        <button id="prev-session" ${sessionIndex === 0 ? "disabled" : ""}>Previous</button>
+        <button id="next-session" ${sessionIndex === workSessions.length - 1 ? "disabled" : ""}>Next</button>
         <button id="close-overlay">Close Overlay</button>
     `;
 
@@ -382,9 +373,7 @@ function displayHistory(sessionIndex) {
     displayHistory(sessionIndex + 1);
   });
 
-  document
-    .getElementById("close-overlay")
-    .addEventListener("click", closeHistory);
+  document.getElementById("close-overlay").addEventListener("click", closeHistory);
 }
 
 function closeHistory() {
