@@ -77,6 +77,10 @@ function createTaskForm() {
   displayTasks();
 }
 
+// Keep track of the item being dragged
+let draggedItem = null;
+let draggedIndex = -1;
+
 function displayTasks() {
   const taskList = document.querySelector(".task-list");
   if (taskList) {
@@ -88,7 +92,8 @@ function displayTasks() {
   newTaskList.innerHTML = tasks
     .map(
       (task, index) => `
-        <li>
+        <li data-list-index="${index}">
+            <span class="grab-handle" draggable="true">::</span>
             <input type="text" value="${task.name}" data-index="${index}" class="task-name">
             <input type="number" value="${task.hours}" data-index="${index}" class="task-hours" step="0.25" min="0">
             <button data-index="${index}" class="remove-task">Remove</button>
@@ -119,6 +124,107 @@ function displayTasks() {
       displayTasks();
     })
   );
+
+  const listItems = newTaskList.querySelectorAll("li");
+  const grabHandles = newTaskList.querySelectorAll(".grab-handle"); // Select all handles
+
+  grabHandles.forEach((handle) => { // Attach listeners to handles
+
+    handle.addEventListener("dragstart", (e) => {
+      draggedItem = handle.parentNode; // The parent is the LI
+      draggedIndex = parseInt(draggedItem.dataset.listIndex);
+      setTimeout(() => draggedItem.classList.add("dragging"), 0);
+    });
+
+    handle.addEventListener("dragend", () => {
+      if (draggedItem) {
+        draggedItem.classList.remove("dragging");
+      }
+      draggedItem = null;
+      draggedIndex = -1;
+      newTaskList.classList.remove('drag-over');
+    });
+  });
+
+  listItems.forEach(item => { // Add listeners for visual state
+    item.addEventListener('mouseenter', () => {
+      item.classList.add('hovered'); // Add "hovered" class to li
+    });
+    item.addEventListener('mouseleave', () => {
+      item.classList.remove('hovered'); // Remove "hovered" class when mouse leaves
+    });
+  });
+
+  newTaskList.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    newTaskList.classList.add('drag-over');
+    const afterElement = getDragAfterElement(newTaskList, e.clientY);
+    const currentDragging = document.querySelector(".dragging");
+    if (currentDragging) {
+      if (afterElement == null) {
+        newTaskList.appendChild(currentDragging);
+      } else {
+        newTaskList.insertBefore(currentDragging, afterElement);
+      }
+    }
+  });
+
+   newTaskList.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        newTaskList.classList.add('drag-over');
+   });
+
+   newTaskList.addEventListener('dragleave', (e) => {
+       if (e.target === newTaskList && !newTaskList.contains(e.relatedTarget)) {
+            newTaskList.classList.remove('drag-over');
+       }
+   });
+
+
+  newTaskList.addEventListener("drop", (e) => {
+    e.preventDefault();
+    newTaskList.classList.remove('drag-over');
+
+    if (draggedItem) {
+      const afterElement = getDragAfterElement(newTaskList, e.clientY);
+      const newIndex = afterElement
+        ? parseInt(afterElement.dataset.listIndex)
+        : tasks.length;
+
+      const itemToMove = tasks[draggedIndex];
+      tasks.splice(draggedIndex, 1);
+
+      const actualNewIndex = (newIndex > draggedIndex) ? newIndex -1 : newIndex;
+
+      tasks.splice(actualNewIndex, 0, itemToMove);
+
+      saveTasks();
+      displayTasks();
+    }
+
+     if (draggedItem) draggedItem.classList.remove('dragging');
+     draggedItem = null;
+     draggedIndex = -1;
+  });
+}
+
+function getDragAfterElement(container, y) {
+  const draggableElements = [
+    ...container.querySelectorAll("li:not(.dragging)"),
+  ];
+
+  return draggableElements.reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    },
+    { offset: Number.NEGATIVE_INFINITY }
+  ).element;
 }
 
 function findOrStartWorkSession() {
